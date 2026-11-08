@@ -1,24 +1,43 @@
 # Anki Linker
 
-Anki Linker creates a new Anki card from the current Obsidian note and inserts a link to that card at the command location. It only creates new cards; it does not synchronize, read, or edit existing card contents.
+Anki Linker is a desktop-only Obsidian plugin that opens Anki's Add dialog and inserts a link to the newly created card at the current cursor. It creates new cards only; it does not read, edit, or synchronize existing card contents.
+
+## Requirements
+
+- Obsidian 1.11.0 or later
+- Anki desktop with the AnkiConnect add-on installed (add-on code **2055492159**)
+- Style Settings community plugin is optional and only needed to customize the link appearance
 
 ## Install
 
-1. Install dependencies and build with `npm install` followed by `npm run build`.
-2. Copy `dist/main.js`, `dist/manifest.json`, and `dist/styles.css` into `<vault>/.obsidian/plugins/anki-linker/`.
-3. Enable **Anki Linker** in Obsidian's Community Plugins settings.
-4. Configure the AnkiConnect URL, default deck, and default note type in the plugin settings. Enable **Copy Obsidian URL when creating a card** to copy the note location automatically; choose **Obsidian URL field** to also prefill that field in Anki.
+1. Download the latest release ZIP from [GitHub Releases](https://github.com/dmantisk/anki-linker/releases).
+2. Extract `main.js`, `manifest.json`, and `styles.css` into `<vault>/.obsidian/plugins/anki-linker/`.
+3. In Obsidian, enable **Anki Linker** under **Settings → Community plugins**.
+4. Open **Settings → Anki Linker**, set the AnkiConnect URL if needed, and select a default deck and note type.
 
-The TypeScript source is kept in `src/`. Run `npm run build` to generate the complete installable plugin files in `dist/`.
+To build from source instead, run `npm install` and `npm run build`, then copy the three files from `dist/` into the plugin folder. TypeScript source is in `src/`.
 
-Anki must be running with the AnkiConnect add-on installed. AnkiConnect's add-on code is **2055492159**.
+## Create a card
 
-## Commands
+Run **Create Anki card here** from the editor command palette. The plugin places a temporary marker at the cursor and opens Anki's Add dialog. When a new card is detected, the marker is replaced with a link to it. Only one card can be pending at a time; starting another request replaces the previous request.
 
-- **Create Anki card here** — opens Anki's Add dialog and inserts the card link when a new card is detected. If **Copy Obsidian URL when creating a card** is enabled, it also copies a link to the current note location and optionally prefills the configured Anki note field.
-- **Cancel pending Anki card** — cancels the active wait and removes its placeholder.
+Use the **Cancel pending Anki card** command or click the persistent waiting notice to cancel. A request also cancels after the configured timeout (15 minutes by default). A leftover `%%anki-pending:...%%` comment is safe to delete.
 
-Commands are available from the editor command palette and do not have default hotkeys. The persistent waiting notice can also be clicked to cancel.
+The plugin settings include:
+
+- AnkiConnect URL, default deck, default note type, and tags for new notes
+- Link text and an optional tag-style link appearance
+- Optional copying of the current Obsidian URL, including the nearest heading
+- An optional Anki note field to prefill with that URL
+- Pending-card timeout
+
+When using **Obsidian URL field**, wrap that field in an HTML link in the Anki card template, for example `<a href="{{Source}}">{{Source}}</a>` (replace `Source` with the selected field name).
+
+## Link appearance
+
+**Style Anki links like tags** is enabled by default and can be turned off in **Settings → Anki Linker → Link Display**. For additional control, install the optional **Style Settings** community plugin to adjust padding, border, colors, corners, and typography under **Settings → Style Settings → Anki Linker**.
+
+Style Settings discovers options from the installed plugin stylesheet. If you update the plugin manually, replace `styles.css` in `<vault>/.obsidian/plugins/anki-linker/` with the latest release's stylesheet and reload Obsidian.
 
 ## Link format
 
@@ -26,14 +45,13 @@ New card links use this form:
 
 `[Open in Anki](obsidian://anki-card?cid=<cardId>)`
 
-Clicking the link opens Anki's browser for that card. If the placeholder was removed before the card was detected, the link is copied to the clipboard instead.
-
-A leftover `%%anki-pending:...%%` comment is safe to delete.
+Clicking the link opens Anki's browser on that card. If the marker was deleted before detection, the link is copied to the clipboard instead.
 
 ## Manual test checklist
 
-1. Enable **Copy Obsidian URL when creating a card**, choose an **Obsidian URL field**, then run **Create Anki card here**: the URL is on the clipboard and prefilled in the selected field, Anki's Add dialog opens, and a placeholder appears.
-2. Add a card in Anki: the placeholder becomes a working link within about 2 seconds.
-3. Click the link: Anki's browser opens on that card.
-4. Trigger the command, then switch to another note before adding the card: the link still lands in the original note.
-5. Trigger the command, then close Anki or click the waiting notice: the placeholder is removed.
+1. Enable **Copy Obsidian URL when creating a card**, choose an **Obsidian URL field**, and run **Create Anki card here**. The URL is copied and prefilled in that field, Anki's Add dialog opens, and a marker appears.
+2. Add a card in Anki. The marker becomes a working link within about two seconds.
+3. Click the link. Anki's browser opens on that card.
+4. Trigger the command, switch to another note, then add the card. The link still appears in the original note.
+5. Trigger the command, then cancel from the notice or close Anki. The marker is removed after cancellation or timeout.
+6. Toggle the tag-style appearance off and on. Confirm the link styling updates immediately.

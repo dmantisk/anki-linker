@@ -1,21 +1,120 @@
-.anki-linker-section-title {
-  margin: 1.5em 0 0.75em;
+/* @settings
+
+name: Anki Linker
+id: anki-linker
+settings:
+  -
+    id: anki-linker-link-style
+    title: Anki link style
+    type: heading
+    level: 2
+  -
+    id: anki-linker-tag-padding-y
+    title: Vertical padding
+    description: CSS length for the tag-style link's vertical padding.
+    type: variable-text
+    default: "var(--tag-padding-y)"
+  -
+    id: anki-linker-tag-padding-x
+    title: Horizontal padding
+    description: CSS length for the tag-style link's horizontal padding.
+    type: variable-text
+    default: "var(--tag-padding-x)"
+  -
+    id: anki-linker-tag-border-width
+    title: Border width
+    description: CSS length for the tag-style link's border.
+    type: variable-text
+    default: "var(--tag-border-width)"
+  -
+    id: anki-linker-tag-border-color
+    title: Border color
+    description: CSS color or variable for the tag-style link's border.
+    type: variable-text
+    default: "var(--tag-border-color)"
+  -
+    id: anki-linker-tag-radius
+    title: Corner radius
+    description: CSS length for the tag-style link's corners.
+    type: variable-text
+    default: "var(--tag-radius)"
+  -
+    id: anki-linker-tag-background
+    title: Background
+    description: CSS color or variable for the tag-style link's background.
+    type: variable-text
+    default: "var(--tag-background)"
+  -
+    id: anki-linker-tag-color
+    title: Text color
+    description: CSS color or variable for the tag-style link's text.
+    type: variable-text
+    default: "var(--tag-color)"
+  -
+    id: anki-linker-tag-size
+    title: Text size
+    description: CSS font size for the tag-style link.
+    type: variable-text
+    default: "var(--tag-size)"
+  -
+    id: anki-linker-tag-weight
+    title: Text weight
+    description: CSS font weight for the tag-style link.
+    type: variable-text
+    default: "var(--tag-weight)"
+  -
+    id: anki-linker-tag-border-color-hover
+    title: Hover border color
+    description: CSS color or variable for the tag-style link's hover border.
+    type: variable-text
+    default: "var(--tag-border-color-hover)"
+  -
+    id: anki-linker-tag-background-hover
+    title: Hover background
+    description: CSS color or variable for the tag-style link's hover background.
+    type: variable-text
+    default: "var(--tag-background-hover)"
+  -
+    id: anki-linker-tag-color-hover
+    title: Hover text color
+    description: CSS color or variable for the tag-style link's hover text.
+    type: variable-text
+    default: "var(--tag-color-hover)"
+
+*/
+
+/* Anki link chip, styled like a native tag */
+body.anki-linker-link-style-enabled a[href^="obsidian://anki-card"],
+body.anki-linker-link-style-enabled .is-live-preview .cm-line:not(.cm-active) .anki-link {
+  display: inline-block;
+  padding: var(--anki-linker-tag-padding-y, var(--tag-padding-y)) var(--anki-linker-tag-padding-x, var(--tag-padding-x));
+  border: var(--anki-linker-tag-border-width, var(--tag-border-width)) solid var(--anki-linker-tag-border-color, var(--tag-border-color));
+  border-radius: var(--anki-linker-tag-radius, var(--tag-radius));
+  background-color: var(--anki-linker-tag-background, var(--tag-background));
+  background-image: none;
+  color: var(--anki-linker-tag-color, var(--tag-color));
+  font-size: var(--anki-linker-tag-size, var(--tag-size));
+  font-weight: var(--anki-linker-tag-weight, var(--tag-weight));
+  text-decoration: none;
+  white-space: nowrap;
 }
 
-.anki-linker-settings-group {
-  padding: 0 1.25em;
-  margin-bottom: 1.5em;
-  overflow: hidden;
-  background-color: var(--background-secondary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-m);
+body.anki-linker-link-style-enabled .is-live-preview .cm-line:not(.cm-active) .anki-link :is(.cm-link, .cm-underline, .cm-url),
+body.anki-linker-link-style-enabled .is-live-preview .cm-line:not(.cm-active) .anki-link:is(.cm-link, .cm-underline, .cm-url) {
+  background-image: none !important;
+  color: inherit;
+  padding-right: 0;
+  text-decoration: none;
 }
 
-.anki-linker-settings-group > .setting-item {
-  padding: 1.1em 0;
-  border-top: 1px solid var(--background-modifier-border);
+body.anki-linker-link-style-enabled a[href^="obsidian://anki-card"]:hover,
+body.anki-linker-link-style-enabled .is-live-preview .cm-line:not(.cm-active) .anki-link:hover {
+  border-color: var(--anki-linker-tag-border-color-hover, var(--tag-border-color-hover));
+  background-color: var(--anki-linker-tag-background-hover, var(--tag-background-hover));
+  color: var(--anki-linker-tag-color-hover, var(--tag-color-hover));
+  text-decoration: none;
 }
 
-.anki-linker-settings-group > .setting-item:first-child {
-  border-top: 0;
+.anki-linker-notice-clickable {
+  cursor: pointer;
 }

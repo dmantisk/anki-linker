@@ -24,6 +24,7 @@ __export(main_exports, {
 });
 module.exports = __toCommonJS(main_exports);
 var import_obsidian3 = require("obsidian");
+var import_view = require("@codemirror/view");
 
 // src/ankiconnect.ts
 var import_obsidian = require("obsidian");
@@ -89,6 +90,7 @@ var DEFAULT_SETTINGS = {
   modelName: "",
   tags: "",
   linkText: "Open in Anki",
+  styleAnkiLinks: true,
   copyObsidianUrl: false,
   obsidianUrlField: "",
   includeNearestHeading: true,
@@ -158,7 +160,12 @@ var AnkiLinkerSettingTab = class extends import_obsidian2.PluginSettingTab {
       })
     );
     if (this.plugin.settings.copyObsidianUrl) {
-      new import_obsidian2.Setting(urlGroup).setName("Obsidian URL field").setDesc("Choose the Anki note field to prefill with the copied URL.").addDropdown((dropdown) => {
+      const fieldDescription = document.createDocumentFragment();
+      fieldDescription.append("Choose the Anki note field to prefill with the copied URL. In your Anki card template, wrap this field in an HTML link: ");
+      const templateExample = document.createElement("code");
+      templateExample.textContent = '<a href="{{Source}}">{{Source}}</a>';
+      fieldDescription.append(templateExample, " (replace Source with the actual field name).");
+      new import_obsidian2.Setting(urlGroup).setName("Obsidian URL field").setDesc(fieldDescription).addDropdown((dropdown) => {
         dropdown.addOption("", "Don't add URL to a field");
         this.addStoredOption(
           dropdown,
@@ -188,6 +195,13 @@ var AnkiLinkerSettingTab = class extends import_obsidian2.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
+    new import_obsidian2.Setting(linkDisplayGroup).setName("Style Anki links like tags").setDesc("Apply the configurable tag-style appearance to Anki card links.").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.styleAnkiLinks).onChange(async (value) => {
+        this.plugin.settings.styleAnkiLinks = value;
+        this.plugin.setLinkStyleEnabled(value);
+        await this.plugin.saveSettings();
+      })
+    );
     const behaviorGroup = this.createSection(containerEl, "Behavior");
     new import_obsidian2.Setting(behaviorGroup).setName("Timeout in minutes").setDesc("Cancel a pending card if no new card is detected by this time.").addText((text) => {
       text.inputEl.setAttribute("type", "number");
@@ -213,8 +227,8 @@ var AnkiLinkerSettingTab = class extends import_obsidian2.PluginSettingTab {
     this.loaded = false;
   }
   createSection(containerEl, title) {
-    containerEl.createEl("h3", { text: title, cls: "anki-linker-section-title" });
-    return containerEl.createDiv({ cls: "anki-linker-settings-group" });
+    const group = new import_obsidian2.SettingGroup(containerEl).setHeading(title);
+    return group.listEl;
   }
   async refreshOptions(showSuccess) {
     try {
@@ -264,6 +278,22 @@ var AnkiLinkerSettingTab = class extends import_obsidian2.PluginSettingTab {
 
 // src/main.ts
 var NEW_CARD_QUERY = "added:2";
+var LINK_STYLE_CLASS = "anki-linker-link-style-enabled";
+var ankiLinkDecorator = new import_view.MatchDecorator({
+  regexp: /\[[^\]]*\]\(obsidian:\/\/anki-card\?[^)\s]*\)/g,
+  decoration: import_view.Decoration.mark({ class: "anki-link" })
+});
+var ankiLinkDecorations = import_view.ViewPlugin.fromClass(
+  class {
+    constructor(view) {
+      this.decorations = ankiLinkDecorator.createDeco(view);
+    }
+    update(update) {
+      this.decorations = ankiLinkDecorator.updateDeco(update, this.decorations);
+    }
+  },
+  { decorations: (plugin) => plugin.decorations }
+);
 var AnkiLinkerPlugin = class extends import_obsidian3.Plugin {
   constructor() {
     super(...arguments);
@@ -272,8 +302,11 @@ var AnkiLinkerPlugin = class extends import_obsidian3.Plugin {
     this.triggerVersion = 0;
   }
   async onload() {
+    this.registerEditorExtension(ankiLinkDecorations);
     const saved = await this.loadData();
     this.settings = { ...DEFAULT_SETTINGS, ...saved != null ? saved : {} };
+    this.setLinkStyleEnabled(this.settings.styleAnkiLinks);
+    this.register(() => document.body.classList.remove(LINK_STYLE_CLASS));
     this.addSettingTab(new AnkiLinkerSettingTab(this.app, this));
     this.addCommand({
       id: "create-anki-card",
@@ -322,6 +355,9 @@ var AnkiLinkerPlugin = class extends import_obsidian3.Plugin {
   async saveSettings() {
     await this.saveData(this.settings);
   }
+  setLinkStyleEnabled(enabled) {
+    document.body.classList.toggle(LINK_STYLE_CLASS, enabled);
+  }
   reportAnkiError(error) {
     new import_obsidian3.Notice(
       error instanceof AnkiConnectError ? `Anki: ${error.message}` : ANKI_UNREACHABLE_MESSAGE
@@ -343,7 +379,7 @@ var AnkiLinkerPlugin = class extends import_obsidian3.Plugin {
     editor.replaceRange(placeholder, insertionPoint);
     const placeholderSave = view.save();
     const notice = new import_obsidian3.Notice("Waiting for Anki card\u2026 click to cancel", 0);
-    notice.noticeEl.style.cursor = "pointer";
+    notice.noticeEl.classList.add("anki-linker-notice-clickable");
     notice.noticeEl.setAttribute("role", "button");
     notice.noticeEl.tabIndex = 0;
     const pending = {

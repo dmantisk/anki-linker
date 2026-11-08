@@ -2,6 +2,7 @@ import {
   Notice,
   PluginSettingTab,
   Setting,
+  SettingGroup,
   type App,
   type DropdownComponent,
 } from "obsidian";
@@ -14,6 +15,7 @@ export interface AnkiLinkerSettings {
   modelName: string;
   tags: string;
   linkText: string;
+  styleAnkiLinks: boolean;
   copyObsidianUrl: boolean;
   obsidianUrlField: string;
   includeNearestHeading: boolean;
@@ -26,6 +28,7 @@ export const DEFAULT_SETTINGS: AnkiLinkerSettings = {
   modelName: "",
   tags: "",
   linkText: "Open in Anki",
+  styleAnkiLinks: true,
   copyObsidianUrl: false,
   obsidianUrlField: "",
   includeNearestHeading: true,
@@ -133,9 +136,15 @@ export class AnkiLinkerSettingTab extends PluginSettingTab {
       );
 
     if (this.plugin.settings.copyObsidianUrl) {
+      const fieldDescription = document.createDocumentFragment();
+      fieldDescription.append("Choose the Anki note field to prefill with the copied URL. In your Anki card template, wrap this field in an HTML link: ");
+      const templateExample = document.createElement("code");
+      templateExample.textContent = '<a href="{{Source}}">{{Source}}</a>';
+      fieldDescription.append(templateExample, " (replace Source with the actual field name).");
+
       new Setting(urlGroup)
         .setName("Obsidian URL field")
-        .setDesc("Choose the Anki note field to prefill with the copied URL.")
+        .setDesc(fieldDescription)
         .addDropdown((dropdown) => {
           dropdown.addOption("", "Don't add URL to a field");
           this.addStoredOption(
@@ -182,6 +191,19 @@ export class AnkiLinkerSettingTab extends PluginSettingTab {
           }),
       );
 
+    new Setting(linkDisplayGroup)
+      .setName("Style Anki links like tags")
+      .setDesc("Apply the configurable tag-style appearance to Anki card links.")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.styleAnkiLinks)
+          .onChange(async (value) => {
+            this.plugin.settings.styleAnkiLinks = value;
+            this.plugin.setLinkStyleEnabled(value);
+            await this.plugin.saveSettings();
+          }),
+      );
+
     const behaviorGroup = this.createSection(containerEl, "Behavior");
     new Setting(behaviorGroup)
       .setName("Timeout in minutes")
@@ -216,8 +238,8 @@ export class AnkiLinkerSettingTab extends PluginSettingTab {
   }
 
   private createSection(containerEl: HTMLElement, title: string): HTMLElement {
-    containerEl.createEl("h3", { text: title, cls: "anki-linker-section-title" });
-    return containerEl.createDiv({ cls: "anki-linker-settings-group" });
+    const group = new SettingGroup(containerEl).setHeading(title);
+    return group.listEl;
   }
 
   private async refreshOptions(showSuccess: boolean): Promise<void> {

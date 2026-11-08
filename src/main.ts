@@ -7,6 +7,14 @@ import {
   type TFile,
 } from "obsidian";
 import {
+  Decoration,
+  MatchDecorator,
+  ViewPlugin,
+  type DecorationSet,
+  type EditorView,
+  type ViewUpdate,
+} from "@codemirror/view";
+import {
   AnkiConnect,
   ANKI_UNREACHABLE_MESSAGE,
   AnkiConnectError,
@@ -18,6 +26,27 @@ import {
 } from "./settings";
 
 const NEW_CARD_QUERY = "added:2";
+const LINK_STYLE_CLASS = "anki-linker-link-style-enabled";
+
+const ankiLinkDecorator = new MatchDecorator({
+  regexp: /\[[^\]]*\]\(obsidian:\/\/anki-card\?[^)\s]*\)/g,
+  decoration: Decoration.mark({ class: "anki-link" }),
+});
+
+const ankiLinkDecorations = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+
+    constructor(view: EditorView) {
+      this.decorations = ankiLinkDecorator.createDeco(view);
+    }
+
+    update(update: ViewUpdate): void {
+      this.decorations = ankiLinkDecorator.updateDeco(update, this.decorations);
+    }
+  },
+  { decorations: (plugin) => plugin.decorations },
+);
 
 interface PendingCard {
   file: TFile;
@@ -39,8 +68,11 @@ export default class AnkiLinkerPlugin extends Plugin {
   private triggerVersion = 0;
 
   async onload(): Promise<void> {
+    this.registerEditorExtension(ankiLinkDecorations);
     const saved = (await this.loadData()) as Partial<AnkiLinkerSettings> | null;
     this.settings = { ...DEFAULT_SETTINGS, ...(saved ?? {}) };
+    this.setLinkStyleEnabled(this.settings.styleAnkiLinks);
+    this.register(() => document.body.classList.remove(LINK_STYLE_CLASS));
     this.addSettingTab(new AnkiLinkerSettingTab(this.app, this));
 
     this.addCommand({
@@ -98,6 +130,10 @@ export default class AnkiLinkerPlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
+  setLinkStyleEnabled(enabled: boolean): void {
+    document.body.classList.toggle(LINK_STYLE_CLASS, enabled);
+  }
+
   reportAnkiError(error: unknown): void {
     new Notice(
       error instanceof AnkiConnectError
@@ -132,7 +168,7 @@ export default class AnkiLinkerPlugin extends Plugin {
     const placeholderSave = view.save();
 
     const notice = new Notice("Waiting for Anki card… click to cancel", 0);
-    notice.noticeEl.style.cursor = "pointer";
+    notice.noticeEl.classList.add("anki-linker-notice-clickable");
     notice.noticeEl.setAttribute("role", "button");
     notice.noticeEl.tabIndex = 0;
 
