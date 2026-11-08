@@ -7,7 +7,7 @@ Anki Linker creates a new Anki card from the current Obsidian note and inserts a
 1. Install dependencies and build with `npm install` followed by `npm run build`.
 2. Copy `dist/main.js`, `dist/manifest.json`, and `dist/styles.css` into `<vault>/.obsidian/plugins/anki-linker/`.
 3. Enable **Anki Linker** in Obsidian's Community Plugins settings.
-4. Configure the AnkiConnect URL, default deck, and default note type in the plugin settings. Enable **Copy Obsidian URL when creating a card** if you want the note location copied automatically.
+4. Configure the AnkiConnect URL, default deck, and default note type in the plugin settings. Enable **Copy Obsidian URL when creating a card** to copy the note location automatically; choose **Obsidian URL field** to also prefill that field in Anki.
 
 The TypeScript source is kept in `src/`. Run `npm run build` to generate the complete installable plugin files in `dist/`.
 
@@ -15,7 +15,7 @@ Anki must be running with the AnkiConnect add-on installed. AnkiConnect's add-on
 
 ## Commands
 
-- **Create Anki card here** — opens Anki's Add dialog and inserts the card link when a new card is detected. If **Copy Obsidian URL when creating a card** is enabled, it also copies a link to the current note location.
+- **Create Anki card here** — opens Anki's Add dialog and inserts the card link when a new card is detected. If **Copy Obsidian URL when creating a card** is enabled, it also copies a link to the current note location and optionally prefills the configured Anki note field.
 - **Cancel pending Anki card** — cancels the active wait and removes its placeholder.
 
 Commands are available from the editor command palette and do not have default hotkeys. The persistent waiting notice can also be clicked to cancel.
@@ -32,7 +32,7 @@ A leftover `%%anki-pending:...%%` comment is safe to delete.
 
 ## Manual test checklist
 
-1. Enable **Copy Obsidian URL when creating a card**, then run **Create Anki card here**: the URL is on the clipboard, Anki's Add dialog opens, and a placeholder appears.
+1. Enable **Copy Obsidian URL when creating a card**, choose an **Obsidian URL field**, then run **Create Anki card here**: the URL is on the clipboard and prefilled in the selected field, Anki's Add dialog opens, and a placeholder appears.
 2. Add a card in Anki: the placeholder becomes a working link within about 2 seconds.
 3. Click the link: Anki's browser opens on that card.
 4. Trigger the command, then switch to another note before adding the card: the link still lands in the original note.

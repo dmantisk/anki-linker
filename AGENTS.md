@@ -1,0 +1,3 @@
+- Explain and question when encountering conflict with the guidelines.
+- Strictly follow Obsidian's guidelines on plugin conventions.
+- Stick to native Obsidian elements only.

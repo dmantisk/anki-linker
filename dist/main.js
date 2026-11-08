@@ -90,6 +90,7 @@ var DEFAULT_SETTINGS = {
   tags: "",
   linkText: "Open in Anki",
   copyObsidianUrl: false,
+  obsidianUrlField: "",
   includeNearestHeading: true,
   timeoutMinutes: 15
 };
@@ -99,18 +100,27 @@ var AnkiLinkerSettingTab = class extends import_obsidian2.PluginSettingTab {
     this.plugin = plugin;
     this.decks = [];
     this.models = [];
+    this.modelFields = [];
+    this.fieldsModelName = "";
     this.loaded = false;
   }
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    new import_obsidian2.Setting(containerEl).setName("AnkiConnect URL").addText(
+    const connectionGroup = this.createSection(containerEl, "Connection");
+    new import_obsidian2.Setting(connectionGroup).setName("AnkiConnect URL").addText(
       (text) => text.setPlaceholder(DEFAULT_SETTINGS.ankiConnectUrl).setValue(this.plugin.settings.ankiConnectUrl).onChange(async (value) => {
         this.plugin.settings.ankiConnectUrl = value.trim();
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("Default deck").setDesc("Choose the deck used when opening Anki's Add dialog.").addDropdown((dropdown) => {
+    new import_obsidian2.Setting(connectionGroup).setName("Refresh from Anki").setDesc("Load available decks and note types from Anki.").addButton(
+      (button) => button.setButtonText("Refresh from Anki").onClick(async () => {
+        await this.refreshOptions(true);
+      })
+    );
+    const cardCreationGroup = this.createSection(containerEl, "Card Creation");
+    new import_obsidian2.Setting(cardCreationGroup).setName("Default deck").setDesc("Choose the deck used when opening Anki's Add dialog.").addDropdown((dropdown) => {
       dropdown.addOption("", "Select a deck");
       this.addStoredOption(dropdown, this.plugin.settings.deckName, this.decks);
       for (const deck of this.decks) dropdown.addOption(deck, deck);
@@ -119,45 +129,67 @@ var AnkiLinkerSettingTab = class extends import_obsidian2.PluginSettingTab {
         await this.plugin.saveSettings();
       });
     });
-    new import_obsidian2.Setting(containerEl).setName("Default note type").setDesc("Choose the note type used when opening Anki's Add dialog.").addDropdown((dropdown) => {
+    new import_obsidian2.Setting(cardCreationGroup).setName("Default note type").setDesc("Choose the note type used when opening Anki's Add dialog.").addDropdown((dropdown) => {
       dropdown.addOption("", "Select a note type");
       this.addStoredOption(dropdown, this.plugin.settings.modelName, this.models);
       for (const model of this.models) dropdown.addOption(model, model);
       dropdown.setValue(this.plugin.settings.modelName).onChange(async (value) => {
         this.plugin.settings.modelName = value;
+        this.plugin.settings.obsidianUrlField = "";
+        this.modelFields = [];
+        this.fieldsModelName = "";
         await this.plugin.saveSettings();
+        this.display();
+        if (value) void this.refreshModelFields(value);
       });
     });
-    new import_obsidian2.Setting(containerEl).setName("Refresh from Anki").setDesc("Load available decks and note types from Anki.").addButton(
-      (button) => button.setButtonText("Refresh from Anki").onClick(async () => {
-        await this.refreshOptions(true);
-      })
-    );
-    new import_obsidian2.Setting(containerEl).setName("Tags to add").setDesc("Comma-separated tags applied to each new note.").addText(
+    new import_obsidian2.Setting(cardCreationGroup).setName("Tags to add").setDesc("Comma-separated tags applied to each new note.").addText(
       (text) => text.setPlaceholder("optional, tags").setValue(this.plugin.settings.tags).onChange(async (value) => {
         this.plugin.settings.tags = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("Link text").setDesc("Text displayed for the link inserted into the note.").addText(
-      (text) => text.setPlaceholder(DEFAULT_SETTINGS.linkText).setValue(this.plugin.settings.linkText).onChange(async (value) => {
-        this.plugin.settings.linkText = value;
-        await this.plugin.saveSettings();
-      })
-    );
-    new import_obsidian2.Setting(containerEl).setName("Copy Obsidian URL when creating a card").setDesc("Copy the current note location to the clipboard when creating a card.").addToggle(
+    const urlGroup = this.createSection(containerEl, "URL Handling");
+    new import_obsidian2.Setting(urlGroup).setName("Copy Obsidian URL when creating a card").setDesc("Copy the current note location and optionally add it to an Anki field.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.copyObsidianUrl).onChange(async (value) => {
         this.plugin.settings.copyObsidianUrl = value;
         await this.plugin.saveSettings();
+        this.display();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("Include nearest heading in copied URL").setDesc("Append the heading above the cursor to copied Obsidian URLs.").addToggle(
+    if (this.plugin.settings.copyObsidianUrl) {
+      new import_obsidian2.Setting(urlGroup).setName("Obsidian URL field").setDesc("Choose the Anki note field to prefill with the copied URL.").addDropdown((dropdown) => {
+        dropdown.addOption("", "Don't add URL to a field");
+        this.addStoredOption(
+          dropdown,
+          this.plugin.settings.obsidianUrlField,
+          this.modelFields
+        );
+        for (const field of this.modelFields) dropdown.addOption(field, field);
+        dropdown.setValue(this.plugin.settings.obsidianUrlField).onChange(async (value) => {
+          this.plugin.settings.obsidianUrlField = value;
+          await this.plugin.saveSettings();
+        });
+        if (!this.plugin.settings.modelName || this.fieldsModelName !== this.plugin.settings.modelName) {
+          dropdown.selectEl.disabled = true;
+        }
+      });
+    }
+    new import_obsidian2.Setting(urlGroup).setName("Include nearest heading in copied URL").setDesc("Append the heading above the cursor to copied Obsidian URLs.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.includeNearestHeading).onChange(async (value) => {
         this.plugin.settings.includeNearestHeading = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("Timeout in minutes").setDesc("Cancel a pending card if no new card is detected by this time.").addText((text) => {
+    const linkDisplayGroup = this.createSection(containerEl, "Link Display");
+    new import_obsidian2.Setting(linkDisplayGroup).setName("Link text").setDesc("Text displayed for the link inserted into the note.").addText(
+      (text) => text.setPlaceholder(DEFAULT_SETTINGS.linkText).setValue(this.plugin.settings.linkText).onChange(async (value) => {
+        this.plugin.settings.linkText = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    const behaviorGroup = this.createSection(containerEl, "Behavior");
+    new import_obsidian2.Setting(behaviorGroup).setName("Timeout in minutes").setDesc("Cancel a pending card if no new card is detected by this time.").addText((text) => {
       text.inputEl.setAttribute("type", "number");
       text.inputEl.setAttribute("min", "1");
       text.inputEl.setAttribute("step", "1");
@@ -180,14 +212,48 @@ var AnkiLinkerSettingTab = class extends import_obsidian2.PluginSettingTab {
   hide() {
     this.loaded = false;
   }
+  createSection(containerEl, title) {
+    containerEl.createEl("h3", { text: title, cls: "anki-linker-section-title" });
+    return containerEl.createDiv({ cls: "anki-linker-settings-group" });
+  }
   async refreshOptions(showSuccess) {
     try {
       const anki = new AnkiConnect(this.plugin.settings.ankiConnectUrl);
       [this.decks, this.models] = await Promise.all([anki.deckNames(), anki.modelNames()]);
+      const selectedModel = this.plugin.settings.modelName;
+      if (selectedModel && this.models.includes(selectedModel)) {
+        this.modelFields = await anki.modelFieldNames(selectedModel);
+        this.fieldsModelName = selectedModel;
+        if (this.plugin.settings.obsidianUrlField && !this.modelFields.includes(this.plugin.settings.obsidianUrlField)) {
+          this.plugin.settings.obsidianUrlField = "";
+          await this.plugin.saveSettings();
+        }
+      } else {
+        this.modelFields = [];
+        this.fieldsModelName = "";
+      }
       if (showSuccess) new import_obsidian2.Notice("Anki decks and note types refreshed.");
       this.display();
     } catch (error) {
       console.error("Failed to refresh Anki settings.", error);
+      this.plugin.reportAnkiError(error);
+    }
+  }
+  async refreshModelFields(modelName) {
+    try {
+      const fields = await new AnkiConnect(
+        this.plugin.settings.ankiConnectUrl
+      ).modelFieldNames(modelName);
+      if (this.plugin.settings.modelName !== modelName) return;
+      this.modelFields = fields;
+      this.fieldsModelName = modelName;
+      if (this.plugin.settings.obsidianUrlField && !fields.includes(this.plugin.settings.obsidianUrlField)) {
+        this.plugin.settings.obsidianUrlField = "";
+        await this.plugin.saveSettings();
+      }
+      this.display();
+    } catch (error) {
+      console.error(`Failed to load fields for Anki note type "${modelName}".`, error);
       this.plugin.reportAnkiError(error);
     }
   }
@@ -269,7 +335,8 @@ var AnkiLinkerPlugin = class extends import_obsidian3.Plugin {
       new import_obsidian3.Notice("Choose a default Anki deck and note type in the plugin settings first.");
       return;
     }
-    if (this.settings.copyObsidianUrl) await this.copyObsidianUrl(file, editor);
+    const obsidianUrl = this.settings.copyObsidianUrl ? this.getObsidianUrl(file, editor) : null;
+    if (obsidianUrl) await this.copyObsidianUrl(obsidianUrl);
     if (triggerVersion !== this.triggerVersion) return;
     const placeholder = `%%anki-pending:${crypto.randomUUID()}%%`;
     const insertionPoint = editor.getCursor("to");
@@ -315,6 +382,15 @@ var AnkiLinkerPlugin = class extends import_obsidian3.Plugin {
       if (this.pendingCard !== pending) return;
       const fields = {};
       for (const fieldName of fieldNames) fields[fieldName] = "";
+      if (obsidianUrl && this.settings.obsidianUrlField) {
+        if (fieldNames.includes(this.settings.obsidianUrlField)) {
+          fields[this.settings.obsidianUrlField] = obsidianUrl;
+        } else {
+          new import_obsidian3.Notice(
+            `The selected URL field "${this.settings.obsidianUrlField}" isn't available in the selected note type.`
+          );
+        }
+      }
       const tags = this.settings.tags.split(",").map((tag) => tag.trim()).filter((tag) => tag.length > 0);
       await anki.guiAddCards({
         deckName: this.settings.deckName,
@@ -435,7 +511,7 @@ var AnkiLinkerPlugin = class extends import_obsidian3.Plugin {
       (content) => content.replace(pending.placeholder, "")
     );
   }
-  async copyObsidianUrl(file, editor) {
+  getObsidianUrl(file, editor) {
     var _a, _b;
     let path = file.path;
     if (this.settings.includeNearestHeading) {
@@ -447,9 +523,11 @@ var AnkiLinkerPlugin = class extends import_obsidian3.Plugin {
         if (headingLink) path += `#${headingLink}`;
       }
     }
-    const url = `obsidian://open?vault=${encodeURIComponent(
+    return `obsidian://open?vault=${encodeURIComponent(
       this.app.vault.getName()
     )}&file=${encodeURIComponent(path)}`;
+  }
+  async copyObsidianUrl(url) {
     try {
       await navigator.clipboard.writeText(url);
       new import_obsidian3.Notice("Obsidian URL copied to the clipboard.");

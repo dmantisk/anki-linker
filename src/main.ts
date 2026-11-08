@@ -120,7 +120,10 @@ export default class AnkiLinkerPlugin extends Plugin {
       return;
     }
 
-    if (this.settings.copyObsidianUrl) await this.copyObsidianUrl(file, editor);
+    const obsidianUrl = this.settings.copyObsidianUrl
+      ? this.getObsidianUrl(file, editor)
+      : null;
+    if (obsidianUrl) await this.copyObsidianUrl(obsidianUrl);
     if (triggerVersion !== this.triggerVersion) return;
 
     const placeholder = `%%anki-pending:${crypto.randomUUID()}%%`;
@@ -171,6 +174,15 @@ export default class AnkiLinkerPlugin extends Plugin {
       if (this.pendingCard !== pending) return;
       const fields: Record<string, string> = {};
       for (const fieldName of fieldNames) fields[fieldName] = "";
+      if (obsidianUrl && this.settings.obsidianUrlField) {
+        if (fieldNames.includes(this.settings.obsidianUrlField)) {
+          fields[this.settings.obsidianUrlField] = obsidianUrl;
+        } else {
+          new Notice(
+            `The selected URL field "${this.settings.obsidianUrlField}" isn't available in the selected note type.`,
+          );
+        }
+      }
       const tags = this.settings.tags
         .split(",")
         .map((tag) => tag.trim())
@@ -314,7 +326,7 @@ export default class AnkiLinkerPlugin extends Plugin {
     );
   }
 
-  private async copyObsidianUrl(file: TFile, editor: Editor): Promise<void> {
+  private getObsidianUrl(file: TFile, editor: Editor): string {
     let path = file.path;
     if (this.settings.includeNearestHeading) {
       const cursorLine = editor.getCursor().line;
@@ -328,9 +340,12 @@ export default class AnkiLinkerPlugin extends Plugin {
         if (headingLink) path += `#${headingLink}`;
       }
     }
-    const url = `obsidian://open?vault=${encodeURIComponent(
+    return `obsidian://open?vault=${encodeURIComponent(
       this.app.vault.getName(),
     )}&file=${encodeURIComponent(path)}`;
+  }
+
+  private async copyObsidianUrl(url: string): Promise<void> {
     try {
       await navigator.clipboard.writeText(url);
       new Notice("Obsidian URL copied to the clipboard.");
